@@ -1,9 +1,23 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>{{ title }}</h1>
-<table>
-  {% for g, r in rows %}
-  <tr><td>{{ g }}</td><td>{{ r }}</td></tr>
-  {% endfor %}
+<h1 class="text-3xl font-bold mb-6">{{ title }}</h1>
+
+<table class="w-full border-collapse text-base">
+  {% if headers %}
+    <thead class="bg-gray-100">
+      <tr>{% for h in headers %}
+        <th class="border p-2 text-left font-semibold">{{ h }}</th>
+      {% endfor %}</tr>
+    </thead>
+  {% endif %}
+  <tbody>
+    {% for row in rows %}
+      <tr class="odd:bg-white even:bg-gray-50">
+        {% for cell in row %}
+          <td class="border px-3 py-2">{{ cell }}</td>
+        {% endfor %}
+      </tr>
+    {% endfor %}
+  </tbody>
 </table>
 {% endblock %}

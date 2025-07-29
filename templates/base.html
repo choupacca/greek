@@ -1,18 +1,41 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8">
-  <title>{{ title or 'Greek vocab' }}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <title>{{ title or 'Greek vocab' }}</title>
 </head>
-<body>
-<nav>
-  <ul>
-    {% for l in sections %}
-      <li><a href="{{ url_for('lesson', slug=l.slug) }}">{{ l.title }}</a></li>
+
+<!-- отступы по краям и сверху, вертикальный flex-контейнер -->
+<body class="min-h-screen flex flex-col
+             px-4 sm:px-6 lg:px-8
+             pt-4 sm:pt-6 lg:pt-8
+             pb-4 sm:pb-6 lg:pb-8">
+
+<!-- НАВИГАЦИЯ -->
+<nav class="mb-6 bg-slate-100 rounded-xl p-3
+              flex flex-col gap-2">          <!-- одна категория = одна строка -->
+    {% for cat, items in sections.items() %}
+    <div class="flex items-center gap-2 flex-wrap">
+        <span class="font-semibold capitalize">{{ cat }}</span>
+        {% for it in items %}
+        <a href="{{ url_for('table', slug=it.slug) }}"
+           class="inline-block px-3 py-1 rounded-md
+                    bg-indigo-500 text-white text-sm
+                    hover:bg-indigo-600 transition">
+            {{ it.title }}
+        </a>
+        {% endfor %}
+    </div>
     {% endfor %}
-  </ul>
 </nav>
-<main>{% block content %}{% endblock %}</main>
+
+<!-- ОСНОВНОЕ СОДЕРЖИМОЕ -->
+<main class="flex-1">
+    {% block content %}{% endblock %}
+</main>
+
 </body>
 </html>
