@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>{{ title or 'Greek vocab' }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+<nav>
+  <ul>
+    {% for l in sections %}
+      <li><a href="{{ url_for('lesson', slug=l.slug) }}">{{ l.title }}</a></li>
+    {% endfor %}
+  </ul>
+</nav>
+<main>{% block content %}{% endblock %}</main>
+</body>
+</html>

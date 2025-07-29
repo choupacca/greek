@@ -1,0 +1,12 @@
+# PyCharm / VS Code
+.idea/
+.vscode/
+
+# Python
+*.py[cod]
+__pycache__/
+.venv/
+env/
+venv/
+build/
+dist/
