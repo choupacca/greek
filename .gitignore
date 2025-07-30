@@ -10,3 +10,6 @@ env/
 venv/
 build/
 dist/
+
+# .gitignore
+hits.db
