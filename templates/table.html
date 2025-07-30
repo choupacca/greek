@@ -3,22 +3,37 @@
 
 <h1 class="text-3xl font-bold mb-4">{{ title }}</h1>
 
-<!-- ПОИСКОВОЕ ПОЛЕ -->
-<input id="search"
-       type="text"
-       placeholder="Search…"
+<!-- поиск по строкам -->
+<input id="search" type="text" placeholder="Поиск…"
        class="w-full mb-4 px-3 py-2 border rounded-md"
        oninput="filterRows()">
 
 <table id="datatable" class="w-full border-collapse text-base">
   {% if headers %}
     <thead class="bg-gray-100">
-      <tr>{% for h in headers %}<th class="border p-2 text-left font-semibold">{{ h }}</th>{% endfor %}</tr>
+      <tr>
+        {% for h in headers %}
+          <th class="border p-2 text-left font-semibold">{{ h }}</th>
+        {% endfor %}
+      </tr>
     </thead>
   {% endif %}
   <tbody>
     {% for row in rows %}
-      <tr>{% for cell in row %}<td class="border px-3 py-2">{{ cell }}</td>{% endfor %}</tr>
+      <tr class="odd:bg-white even:bg-gray-50">
+        {% for cell in row %}
+          {% set greek = cell.split('(')[0].strip().rstrip('!?.,·') %}
+          <td class="border px-3 py-2">
+            {{ cell }}
+            {% if greek|is_greek %}
+              <button onclick="play('{{ greek }}')"
+                      class="ml-2 text-indigo-500 hover:text-indigo-700">
+                🔊
+              </button>
+            {% endif %}
+          </td>
+        {% endfor %}
+      </tr>
     {% endfor %}
   </tbody>
 </table>
@@ -27,9 +42,13 @@
 function filterRows(){
   const q = document.getElementById('search').value.toLowerCase();
   document.querySelectorAll('#datatable tbody tr').forEach(tr=>{
-    const text = tr.innerText.toLowerCase();
-    tr.style.display = text.includes(q) ? '' : 'none';
+    tr.style.display = tr.innerText.toLowerCase().includes(q) ? '' : 'none';
   });
+}
+function play(text){
+  text = text.replace(/[!?.,·]/g, '').trim();
+  const a = new Audio('/tts?q=' + encodeURIComponent(text));
+  a.play();
 }
 </script>
 
