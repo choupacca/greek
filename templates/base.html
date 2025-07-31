@@ -11,7 +11,8 @@
 </head>
 
 <!-- отступы по краям и сверху, вертикальный flex-контейнер -->
-<body class="min-h-screen flex flex-col
+<body class="font-sans text-lg
+             min-h-screen flex flex-col
              px-4 sm:px-6 lg:px-8
              pt-4 sm:pt-6 lg:pt-8
              pb-4 sm:pb-6 lg:pb-8">
@@ -25,7 +26,7 @@
         {% for it in items %}
         <a href="{{ url_for('table', slug=it.slug) }}"
            class="inline-block px-3 py-1 rounded-md
-                    bg-indigo-500 text-white text-sm
+                    bg-indigo-500 text-white
                     hover:bg-indigo-600 transition">
             {{ it.title }}
         </a>

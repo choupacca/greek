@@ -3,17 +3,26 @@
 
 <h1 class="text-3xl font-bold mb-4">{{ title }}</h1>
 
-<!-- поиск по строкам -->
 <input id="search" type="text" placeholder="Поиск…"
        class="w-full mb-4 px-3 py-2 border rounded-md"
        oninput="filterRows()">
 
-<table id="datatable" class="w-full border-collapse text-base">
+{% if cat in ['vocab', 'phrases'] %}
+<button onclick="startDrill()"
+        class="mb-4 px-4 py-2 bg-amber-500 text-white rounded-md">
+  Карточки
+</button>
+{% endif %}
+
+<table id="datatable" class="w-full border-collapse">
   {% if headers %}
     <thead class="bg-gray-100">
       <tr>
         {% for h in headers %}
-          <th class="border p-2 text-left font-semibold">{{ h }}</th>
+          <th class="border p-2 text-left font-semibold cursor-pointer select-none"
+              onclick="sortCol({{ loop.index0 }})">
+            {{ h }} <span id="arrow{{ loop.index0 }}"></span>
+          </th>
         {% endfor %}
       </tr>
     </thead>
@@ -24,12 +33,10 @@
         {% for cell in row %}
           {% set greek = cell.split('(')[0].strip().rstrip('!?.,·') %}
           <td class="border px-3 py-2">
-            {{ cell }}
+            <span class="word">{{ cell }}</span>
             {% if greek|is_greek %}
               <button onclick="play('{{ greek }}')"
-                      class="ml-2 text-indigo-500 hover:text-indigo-700">
-                🔊
-              </button>
+                      class="ml-2 text-indigo-500 hover:text-indigo-700">🔊</button>
             {% endif %}
           </td>
         {% endfor %}
@@ -38,18 +45,99 @@
   </tbody>
 </table>
 
+<!-- ───── модальное окно карточек ───── -->
+<div id="modal" class="fixed inset-0 hidden z-50">
+  <div class="absolute inset-0 bg-white"></div>
+
+  <div class="relative z-10 flex flex-col items-center justify-center
+              h-full w-full max-w-lg mx-auto p-8">
+    <button onclick="closeDrill()"
+            class="absolute right-4 top-4 text-2xl text-gray-500 hover:text-gray-700">✕</button>
+    <button id="speakBtn"
+            class="absolute left-4 top-4 text-2xl text-indigo-500 hover:text-indigo-700">🔊</button>
+
+    <div id="front" class="text-2xl font-bold mb-6 text-center"></div>
+
+    <button id="flipBtn"
+            class="px-6 py-3 bg-indigo-600 text-white rounded-md">
+      Показать ответ
+    </button>
+  </div>
+</div>
+
 <script>
+/* ---------- поиск ---------- */
 function filterRows(){
-  const q = document.getElementById('search').value.toLowerCase();
+  const q=document.getElementById('search').value.toLowerCase();
   document.querySelectorAll('#datatable tbody tr').forEach(tr=>{
     tr.style.display = tr.innerText.toLowerCase().includes(q) ? '' : 'none';
   });
 }
-function play(text){
-  text = text.replace(/[!?.,·]/g, '').trim();
-  const a = new Audio('/tts?q=' + encodeURIComponent(text));
-  a.play();
-}
-</script>
 
+/* ---------- озвучка ---------- */
+function play(text){
+  text = text.replace(/[!?.,·]/g,'').trim();
+  new Audio('/tts?q='+encodeURIComponent(text)).play();
+}
+
+/* ---------- сортировка ---------- */
+let sortState={};
+function sortCol(idx){
+  const tbody=document.querySelector('#datatable tbody');
+  const rows=[...tbody.querySelectorAll('tr')];
+  const order=sortState[idx]==='asc'?'desc':'asc';
+  sortState[idx]=order;
+
+  rows.sort((a,b)=>{
+    const A=a.children[idx].innerText.trim().toLowerCase();
+    const B=b.children[idx].innerText.trim().toLowerCase();
+    const cmp=A.localeCompare(B,'el',{sensitivity:'accent'})||
+              A.localeCompare(B,'ru',{sensitivity:'accent'})||
+              A.localeCompare(B);
+    return order==='asc'?cmp:-cmp;
+  });
+  rows.forEach(tr=>tbody.appendChild(tr));
+  document.querySelectorAll('[id^=arrow]').forEach(el=>el.textContent='');
+  document.getElementById('arrow'+idx).textContent = order==='asc'?'▲':'▼';
+}
+
+/* ---------- карточки ---------- */
+let cards=[],idx=0;
+function startDrill(){
+  const ruIdx=[...document.querySelectorAll('#datatable thead th')]
+              .findIndex(th=>th.innerText.trim().toLowerCase()==='русский');
+  if(ruIdx===-1){alert('Нет колонки "Русский"');return;}
+
+  cards=[...document.querySelectorAll('#datatable tbody tr')].map(tr=>{
+    const front=tr.querySelector('.word').innerText.split('(')[0].trim();
+    const back =tr.children[ruIdx].innerText.trim();
+    return [front, back];
+  });
+  shuffle(cards); idx=0;
+  document.addEventListener('keydown', escClose);
+  document.getElementById('modal').classList.remove('hidden');
+  nextCard();
+}
+function nextCard(){
+  if(idx>=cards.length){ return closeDrill(); }
+  const [front,back]=cards[idx++];
+  const f=document.getElementById('front');
+  const btn=document.getElementById('flipBtn');
+  f.textContent=front;
+  btn.textContent='Показать ответ';
+  btn.onclick=()=>{
+    f.textContent=back||'(нет перевода)';
+    btn.textContent = idx<cards.length ? 'Дальше' : 'Закрыть';
+    btn.onclick     = idx<cards.length ? nextCard : closeDrill;
+  }
+  document.getElementById('speakBtn').onclick = ()=>play(front);
+}
+function closeDrill(){
+  document.getElementById('modal').classList.add('hidden');
+  document.removeEventListener('keydown', escClose);
+}
+function escClose(e){ if(e.key==='Escape') closeDrill(); }
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}}
+
+</script>
 {% endblock %}
