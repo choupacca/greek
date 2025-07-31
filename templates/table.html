@@ -104,8 +104,10 @@ function sortCol(idx){
 /* ---------- карточки ---------- */
 let cards=[],idx=0;
 function startDrill(){
-  const ruIdx=[...document.querySelectorAll('#datatable thead th')]
-              .findIndex(th=>th.innerText.trim().toLowerCase()==='русский');
+  const ruIdx = [...document.querySelectorAll('#datatable thead th')]
+                .findIndex(th =>
+                  th.textContent.trim().toLowerCase().startsWith('русский')
+                );
   if(ruIdx===-1){alert('Нет колонки "Русский"');return;}
 
   cards=[...document.querySelectorAll('#datatable tbody tr')].map(tr=>{
