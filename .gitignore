@@ -13,3 +13,5 @@ dist/
 
 # .gitignore
 hits.db
+
+data/phrases/swear-words.json
