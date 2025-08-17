@@ -16,7 +16,7 @@
 
 <table id="datatable" class="w-full border-collapse">
   {% if headers %}
-    <thead class="bg-gray-100">
+    <thead class="bg-cyan-100">
       <tr>
         {% for h in headers %}
           <th class="border p-2 text-left font-semibold cursor-pointer select-none"
@@ -27,22 +27,35 @@
       </tr>
     </thead>
   {% endif %}
-  <tbody>
-    {% for row in rows %}
-      <tr class="odd:bg-white even:bg-gray-50">
+<tbody>
+  {% set colcnt = headers|length %}
+  {% for row in rows %}
+    {% if row is string %}
+      {# строка-разделитель секции #}
+      <tr class="section-row">
+        <td colspan="{{ colcnt }}" class="border px-4 py-2 bg-sky-100 font-semibold text-center">
+          {{ row }}
+        </td>
+      </tr>
+    {% else %}
+      <tr class="odd:bg-white even:bg-grey-50">
         {% for cell in row %}
           {% set greek = cell.split('(')[0].replace('—', ' ').replace('-', ' ').strip().rstrip('!?.,·') %}
           <td class="border px-3 py-2">
-            <span class="word">{{ cell }}</span>
             {% if greek|is_greek %}
-              <button onclick="play('{{ greek }}')"
-                      class="ml-2 text-indigo-500 hover:text-indigo-700">🔊</button>
+              <span
+                class="{% if loop.index0 == 0 %}word {% endif %}text-indigo-600 font-bold cursor-pointer"
+                onclick="play('{{ greek }}')"
+              >{{ cell }}</span>
+            {% else %}
+              {{ cell }}
             {% endif %}
           </td>
         {% endfor %}
       </tr>
-    {% endfor %}
-  </tbody>
+    {% endif %}
+  {% endfor %}
+</tbody>
 </table>
 
 <!-- ───── модальное окно карточек ───── -->
@@ -53,9 +66,8 @@
               h-full w-full max-w-lg mx-auto p-8">
     <button onclick="closeDrill()"
             class="absolute right-4 top-4 text-2xl text-gray-500 hover:text-gray-700">✕</button>
-    <button id="speakBtn"
-            class="absolute left-4 top-4 text-2xl text-indigo-500 hover:text-indigo-700">🔊</button>
 
+    <!-- кликабельное слово/ответ -->
     <div id="front" class="text-2xl font-bold mb-6 text-center"></div>
 
     <button id="flipBtn"
@@ -66,10 +78,14 @@
 </div>
 
 <script>
+/* есть ли в таблице строки-разделители */
+const hasSections = !!document.querySelector('#datatable tbody tr.section-row');
+
 /* ---------- поиск ---------- */
 function filterRows(){
   const q=document.getElementById('search').value.toLowerCase();
   document.querySelectorAll('#datatable tbody tr').forEach(tr=>{
+    if (tr.classList.contains('section-row')) { tr.style.display=''; return; }
     tr.style.display = tr.innerText.toLowerCase().includes(q) ? '' : 'none';
   });
 }
@@ -83,8 +99,10 @@ function play(text){
 /* ---------- сортировка ---------- */
 let sortState={};
 function sortCol(idx){
+  if (hasSections) return;   // не сортируем, если есть секции
   const tbody=document.querySelector('#datatable tbody');
-  const rows=[...tbody.querySelectorAll('tr')];
+  const rows=[...tbody.querySelectorAll('tr')]
+              .filter(tr=>!tr.classList.contains('section-row'));
   const order=sortState[idx]==='asc'?'desc':'asc';
   sortState[idx]=order;
 
@@ -110,11 +128,18 @@ function startDrill(){
                 );
   if(ruIdx===-1){alert('Нет колонки "Русский"');return;}
 
-  cards=[...document.querySelectorAll('#datatable tbody tr')].map(tr=>{
+  // только обычные строки и где есть .word
+  const trs=[...document.querySelectorAll('#datatable tbody tr')]
+            .filter(tr=>!tr.classList.contains('section-row') && tr.querySelector('.word'));
+
+  cards=trs.map(tr=>{
     const front=tr.querySelector('.word').innerText.split('(')[0].trim();
-    const back =tr.children[ruIdx].innerText.trim();
+    const back = (tr.children[ruIdx]?.innerText || '').trim();
     return [front, back];
   });
+
+  if (!cards.length){ alert('Нет данных для карточек'); return; }
+
   shuffle(cards); idx=0;
   document.addEventListener('keydown', escClose);
   document.getElementById('modal').classList.remove('hidden');
@@ -125,14 +150,22 @@ function nextCard(){
   const [front,back]=cards[idx++];
   const f=document.getElementById('front');
   const btn=document.getElementById('flipBtn');
-  f.textContent=front;
+
+  // лицевая сторона: слово синее, жирное, кликабельное (звучит по клику)
+  f.textContent = front;
+  f.classList.add('text-indigo-600','cursor-pointer');
+  f.onclick = ()=>play(front);
+
   btn.textContent='Показать ответ';
   btn.onclick=()=>{
-    f.textContent=back||'(нет перевода)';
+    // оборот: показываем перевод, звук и подсветку убираем
+    f.textContent = back || '(нет перевода)';
+    f.classList.remove('text-indigo-600','cursor-pointer');
+    f.onclick = null;
+
     btn.textContent = idx<cards.length ? 'Дальше' : 'Закрыть';
     btn.onclick     = idx<cards.length ? nextCard : closeDrill;
   }
-  document.getElementById('speakBtn').onclick = ()=>play(front);
 }
 function closeDrill(){
   document.getElementById('modal').classList.add('hidden');

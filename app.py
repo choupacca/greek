@@ -3,7 +3,7 @@ from collections import defaultdict
 from collections.abc import Generator
 from flask import (
     Flask, render_template, render_template_string,
-    request, send_file, abort, g
+    request, send_file, abort, g, send_from_directory
 )
 from gtts import gTTS                    # pip install gTTS
 import matplotlib
@@ -47,7 +47,7 @@ def table(slug):
                 headers  = data.get("headers"),
                 rows     = data["entries"],
                 sections = SECTIONS,
-                cat      = cat                # ← передаём в шаблон
+                cat      = cat
             )
     abort(404)
 
@@ -93,9 +93,8 @@ def get_db():
 def log_hit():
     if request.endpoint == "table":
         slug = request.view_args.get("slug")
-        if slug not in VALID_SLUGS:      # ← фильтруем мусорные URL
+        if slug not in VALID_SLUGS:      # фильтруем мусорные URL
             return
-
         today = datetime.date.today().isoformat()
         ip    = request.headers.get("X-Forwarded-For",
                                    request.remote_addr).split(",")[0]
@@ -109,67 +108,82 @@ def close_db(_exc):
     if (db := g.pop("db", None)):
         db.close()
 
-# ──────────── PNG-график статистики ────────────
+# ──────────── PNG-график статистики (только Total) ────────────
 @app.route("/stats.png")
 def stats_png():
-    db   = get_db()
-    rows = db.execute("""SELECT date, path, COUNT(*) AS c
-                         FROM hits GROUP BY date, path
-                         ORDER BY date, path""").fetchall()
-    total_rows = db.execute("""SELECT date, COUNT(DISTINCT ip) c
-                               FROM hits GROUP BY date""").fetchall()
-    total_map = {d: c for d, c in total_rows}
+    db = get_db()
+    total_rows = db.execute("""SELECT date, COUNT(DISTINCT ip) AS c
+                               FROM hits
+                               GROUP BY date
+                               ORDER BY date""").fetchall()
+    if not total_rows:
+        # чтобы было что показать
+        total_rows = [(datetime.date.today().isoformat(), 0)]
 
-    data = defaultdict(dict)        # path -> {date: c}
-    for d, p, c in rows:
-        data[p][d] = c
-
-    dates = sorted({d for d, _, _ in rows}) or [datetime.date.today().isoformat()]
+    dates = [d for d, _ in total_rows]
     x = [datetime.datetime.fromisoformat(d) for d in dates]
+    y = [c for _, c in total_rows]
 
-    fig, ax = plt.subplots()
-    for path, series in data.items():
-        y = [series.get(d, 0) for d in dates]
-        ax.plot(x, y, marker="o", label=path, linewidth=1)
-
-    # линия Total
-    y_tot = [total_map.get(d, 0) for d in dates]
-    ax.plot(x, y_tot, marker="o", color="black", linewidth=3, label="Total")
-
+    fig, ax = plt.subplots(figsize=(8, 5), dpi=160)
+    ax.plot(x, y, marker="o", color="black", linewidth=4)
     ax.set_title("Уникальные IP / день")
     ax.set_xlabel("Дата")
-    ax.set_ylabel("Uniq IP")
-    ax.legend(fontsize=8)
-    fig.autofmt_xdate()
+    ax.set_ylabel("Total")
+    ax.grid(True, alpha=0.25)
+    fig.autofmt_xdate(rotation=30)
 
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=120, bbox_inches="tight")
+    plt.tight_layout()
+    fig.savefig(buf, format="png")
     plt.close(fig)
     buf.seek(0)
     return send_file(buf, mimetype="image/png")
 
-# ──────────── HTML-страница статистики ────────────
+# ──────────── HTML-страница статистики (таблица с Total) ────────────
 @app.route("/stats")
 def stats():
     db = get_db()
-    rows = db.execute("""SELECT date, path, COUNT(*) c
-                         FROM hits GROUP BY date, path
-                         ORDER BY date DESC, path""").fetchall()
+    rows = db.execute("""SELECT date, COUNT(DISTINCT ip) AS total
+                         FROM hits
+                         GROUP BY date
+                         ORDER BY date DESC""").fetchall()
+
     html = """
     <h1 class="text-2xl font-bold mb-4">Στατιστικά (unique IP)</h1>
-    <img src="/stats.png" alt="graph">
+    <img src="/stats.png" alt="graph" style="max-width:100%;height:auto">
     <table class="mt-6 border-collapse">
-      <tr><th class="border px-2">Date</th>
-          <th class="border px-2">Page</th>
-          <th class="border px-2">Uniq</th></tr>
-      {% for d,p,c in rows %}
-        <tr><td class="border px-2">{{ d }}</td>
-            <td class="border px-2">{{ p }}</td>
-            <td class="border px-2 text-right">{{ c }}</td></tr>
+      <thead>
+        <tr>
+          <th class="border px-2">Date</th>
+          <th class="border px-2">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for d, t in rows %}
+        <tr>
+          <td class="border px-2">{{ d }}</td>
+          <td class="border px-2 text-right">{{ t }}</td>
+        </tr>
       {% endfor %}
+      </tbody>
     </table>
     """
-    return render_template_string(html, rows=rows)
+    # rows приходит как list[tuple] (date, total)
+    rows_tuples = [(d, t) for d, t in rows]
+    return render_template_string(html, rows=rows_tuples)
+
+
+@app.route("/favicon.ico")
+def favicon_ico():
+    return send_from_directory(BASE_DIR / "static", "favicon.ico",
+                               mimetype="image/x-icon")
+
+
+@app.route("/apple-touch-icon.png")
+def apple_touch_icon():
+    return send_from_directory(BASE_DIR / "static", "apple-touch-icon.png",
+                               mimetype="image/png")
+
 
 # ──────────── локальный запуск ────────────
 if __name__ == "__main__":
